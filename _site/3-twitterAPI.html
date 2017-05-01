@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+<meta name="author" content="Grace Kong, Iris Chen &amp; Fang Liu (Group P)" />
+
+
+<title>Data Visualization Final Project: Health Insurance Coverage in the United States</title>
+
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/bootstrap.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-1.1/default.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-1.1/highlight.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs && document.readyState && document.readyState === "complete") {
+   window.setTimeout(function() {
+      hljs.initHighlighting();
+   }, 0);
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+
+</head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+  height: auto;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+</style>
+
+
+<style type="text/css">
+/* padding for bootstrap navbar */
+body {
+  padding-top: 51px;
+  padding-bottom: 40px;
+}
+/* offset scroll position for anchor links (for fixed navbar)  */
+.section h1 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+
+.section h2 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h3 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h4 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h5 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h6 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+</style>
+
+<script>
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.parent().addClass('active');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+});
+</script>
+
+
+<div class="container-fluid main-container">
+
+<!-- tabsets -->
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+
+
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html"> Health Insurance Coverage in the United States</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li>
+  <a href="1-interactive.html">Overview of Insurance Coverage</a>
+</li>
+<li>
+  <a href="2-nyt.html">New York Times Articles</a>
+</li>
+<li>
+  <a href="3-twitterAPI.html">Twitter API</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div class="fluid-row" id="header">
+
+
+
+<h1 class="title toc-ignore">Data Visualization Final Project: Health Insurance Coverage in the United States</h1>
+<h4 class="author"><em>Grace Kong, Iris Chen &amp; Fang Liu (Group P)</em></h4>
+
+</div>
+
+
+<div id="twitter-api-sentimenttext-analysis" class="section level2">
+<h2>#Twitter API Sentiment/Text Analysis</h2>
+<p>Get some tweets from Twitter to analyze and visualize Set up Twitter API: Selecting data including Obamacare, ACA, Affordable Care Act, and #ACA (n=1000)</p>
+<p>Who was tweeting most in the sample we collected</p>
+<p>Let’s have a go at parsing some tweets, pulling out the names of folk who have been retweeted or who have had a tweet sent to them:</p>
+<p><strong>figure 13</strong>_</p>
+<p>Extracting the source application. (We’re looking only at the iPhone and Android tweets- a much smaller number are from the web client or iPad). Overall, this includes 388 tweets from iPhone, and 256 tweets from Android. One consideration is what time of day the tweets occur, which we’d expect to be a “signature” of their user. Here we can certainly spot a difference:</p>
+<pre><code>## 
+## Android  iPhone 
+##     230     258</code></pre>
+<p><img src="3-twitterAPI_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
+<p><strong>figure 14</strong>_ In the remaining by-word analyses in this text, we filter these quoted tweets out (since they contain text from followers that may not be representative of original tweets. Somewhere else we can see a difference involves sharing links or pictures in tweets. <img src="3-twitterAPI_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
+<p><strong>figure 15</strong>_ Comparison of words Now that we’re sure there’s a difference, what can we say about the difference in the content? We’ll use the tidytext package. We start by dividing into individual words using the unnest_tokens function, and removing some common stopwords.</p>
+<p><img src="3-twitterAPI_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
+<p>Sentiment analysis: Since we’ve observed a difference in sentiment between the Android and iPhone tweets, let’s try quantifying it. We’ll work with the NRC Word-Emotion Association lexicon, available from the tidytext package, which associates words with 10 sentiments: positive, negative, anger, anticipation, disgust, fear, joy, sadness, surprise, and trust.</p>
+<p>To measure the sentiment of the Android and iPhone tweets, we can count the number of words in each category. (For example, we see that 41 of the 2331 words in the Android tweets were associated with “anger”). We then want to measure how much more likely the Android account is to use an emotionally-charged term relative to the iPhone account. Since this is count data, we can use a Poisson test to measure the difference:</p>
+<p><strong>figure 16</strong>_ <img src="3-twitterAPI_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
+<p>Data Preparation using Twitter: The Twitter search API does not return an exhaustive list of tweets that match your search criteria, as Twitter only makes available a sample of recent tweets. For a more comprehensive search, we will need to use the Twitter streaming API, creating a database of results and regularly updating them, or use an online service that can do this. Now that we have tweet texts, we need to clean them up before doing any analysis. This involves removing content, such as punctuation, that has no emotional content, and removing any content that causes errors.</p>
+<p>Text Cleaning</p>
+<p><strong>figure 17</strong>_ Frequent Words and Associations</p>
+<p><strong>figure 18</strong>_ Word Cloud <img src="3-twitterAPI_files/figure-html/unnamed-chunk-13-1.png" width="672" /></p>
+<p>Topic Modelling</p>
+<pre><code>##      Topic 1  Topic 2  Topic 3  Topic 4  Topic 5  Topic 6  Topic 7 
+## [1,] &quot;act&quot;    &quot;care&quot;   &quot;care&quot;   &quot;care&quot;   &quot;care&quot;   &quot;care&quot;   &quot;act&quot;   
+## [2,] &quot;repeal&quot; &quot;act&quot;    &quot;afford&quot; &quot;afford&quot; &quot;act&quot;    &quot;rt&quot;     &quot;now&quot;   
+## [3,] &quot;now&quot;    &quot;afford&quot; &quot;act&quot;    &quot;rt&quot;     &quot;realiz&quot; &quot;act&quot;    &quot;care&quot;  
+## [4,] &quot;afford&quot; &quot;dont&quot;   &quot;rt&quot;     &quot;repeal&quot; &quot;now&quot;    &quot;repeal&quot; &quot;realiz&quot;
+## [5,] &quot;gop&quot;    &quot;repeal&quot; &quot;now&quot;    &quot;folk&quot;   &quot;rt&quot;     &quot;dont&quot;   &quot;afford&quot;
+## [6,] &quot;close&quot;  &quot;folk&quot;   &quot;close&quot;  &quot;right&quot;  &quot;dont&quot;   &quot;right&quot;  &quot;close&quot; 
+##      Topic 8 
+## [1,] &quot;act&quot;   
+## [2,] &quot;rt&quot;    
+## [3,] &quot;afford&quot;
+## [4,] &quot;gop&quot;   
+## [5,] &quot;dont&quot;  
+## [6,] &quot;right&quot;</code></pre>
+</div>
+
+
+
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

@@ -10,7 +10,7 @@ output:
 ---
 Get some tweets from Twitter to analyze and visualize
 Set up Twitter API: Selecting data including Obamacare, ACA, Affordable Care Act, and #ACA (n=1000)
-```{r}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 library(httr)
 #library(oauth)
 library(ROAuth)
@@ -45,7 +45,7 @@ head(tweets.df,3)
 ```
 
 Who was tweeting most in the sample we collected
-```{r, include=FALSE}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 counts=table(tweets.df$screenName)
 barplot(counts)
 # Let's do something hacky:
@@ -56,7 +56,7 @@ barplot(cc,las=2,cex.names =0.3)
 
 Let's have a go at parsing some tweets, pulling out the names of folk who have been retweeted or 
 who have had a tweet sent to them:
-```{r, include=FALSE}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 tweets.df$text=sapply(tweets.df$text,function(row) iconv(row,to='UTF-8'))
  
 #A helper function to remove @ symbols from user names...
@@ -81,7 +81,7 @@ __figure 13___
 
 Extracting the source application. (We're looking only at the iPhone and Android tweets- a much smaller number are from the web client or iPad).
 Overall, this includes 388 tweets from iPhone, and 256 tweets from Android. One consideration is what time of day the tweets occur, which we'd expect to be a "signature" of their user. Here we can certainly spot a difference:
-```{r}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 library(tidyr)
 library(dplyr)
 library(purrr)
@@ -107,7 +107,7 @@ tweets %>%
 
 __figure 14___
 In the remaining by-word analyses in this text, we filter these quoted tweets out (since they contain text from followers that may not be representative of original tweets. Somewhere else we can see a difference involves sharing links or pictures in tweets.
-```{r}
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
 tweet_picture_counts <- tweets %>%
   filter(!str_detect(text, '^"')) %>%
   count(source,
@@ -124,7 +124,7 @@ __figure 15___
 Comparison of words
 Now that we're sure there's a difference, what can we say about the difference in the content? We'll use the tidytext package. We start by dividing into individual words using the unnest_tokens function, and removing some common stopwords.
 
-```{r}
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
 library(tidytext)
 
 reg <- "([^A-Za-z\\d#@']|'(?![A-Za-z\\d#@]))"
@@ -142,7 +142,7 @@ term_count1 <- freq_terms(tweet_words$word,20)
 plot(term_count1)
 ```
 
-```{r, include=FALSE}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 android_iphone_ratios <- tweet_words %>%
   count(word, source) %>%
   filter(sum(n) >= 5) %>%
@@ -170,16 +170,15 @@ ggplot(data=android_iphone_ratios, aes(x = word, y=iPhone)) +
 
 Sentiment analysis:
 Since we've observed a difference in sentiment between the Android and iPhone tweets, let's try quantifying it. We'll work with the NRC Word-Emotion Association lexicon, available from the tidytext package, which associates words with 10 sentiments: positive, negative, anger, anticipation, disgust, fear, joy, sadness, surprise, and trust.
-```{r}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 nrc <- sentiments %>%
   filter(lexicon == "nrc") %>%
   dplyr::select(word, sentiment)
-nrc
 ```
 
 
 To measure the sentiment of the Android and iPhone tweets, we can count the number of words in each category. (For example, we see that 41 of the 2331 words in the Android tweets were associated with "anger"). We then want to measure how much more likely the Android account is to use an emotionally-charged term relative to the iPhone account. Since this is count data, we can use a Poisson test to measure the difference:
-```{r}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 sources <- tweet_words %>%
   group_by(source) %>%
   mutate(total_words = n()) %>%
@@ -200,14 +199,14 @@ head(by_source_sentiment)
 ```
 
 __figure 16___
-```{r}
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
 library(broom)
 
 sentiment_differences <- by_source_sentiment %>%
   group_by(sentiment) %>%
   do(tidy(poisson.test(.$words, .$total_words)))
 
-sentiment_differences
+#sentiment_differences
 
 #library(reshape2)
 #df.long <- melt(by_source_sentiment)
@@ -224,7 +223,7 @@ Now that we have tweet texts, we need to clean them up before doing any analysis
 
 
 Text Cleaning
-```{r}
+```{r, message=FALSE, warning=FALSE, include=FALSE}
 library(tm)
 # build a corpus, and specify the source to be character vectors
 myCorpus <- Corpus(VectorSource(tweets.df$text))
@@ -310,7 +309,7 @@ tdm
 
 __figure 17___
 Frequent Words and Associations
-```{r}
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
 term.freq <- rowSums(as.matrix(tdm))
 term.freq <- subset(term.freq, term.freq >= 15)
 df <- data.frame(term = names(term.freq), freq = term.freq)
@@ -320,9 +319,9 @@ xlab("Terms") + ylab("Count") + coord_flip()
 
 ```
 
-__figure 17___
+__figure 18___
 Word Cloud
-```{r}
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
 #library(graph)
 #source("http://bioconductor.org/biocLite.R")
 #biocLite("Rgraphviz")
@@ -346,7 +345,7 @@ random.order = F, colors = pal)
 
 
 Topic Modelling
-```{r}
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
 dtm <- as.DocumentTermMatrix(tdm)
 library(topicmodels)
 lda <- LDA(dtm, k = 8) # find 8 topics

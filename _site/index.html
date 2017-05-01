@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+
+
+<title>Crime in NYC</title>
+
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/bootstrap.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-1.1/default.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-1.1/highlight.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs && document.readyState && document.readyState === "complete") {
+   window.setTimeout(function() {
+      hljs.initHighlighting();
+   }, 0);
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+
+</head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+  height: auto;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+</style>
+
+
+<style type="text/css">
+/* padding for bootstrap navbar */
+body {
+  padding-top: 51px;
+  padding-bottom: 40px;
+}
+/* offset scroll position for anchor links (for fixed navbar)  */
+.section h1 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+
+.section h2 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h3 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h4 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h5 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+.section h6 {
+  padding-top: 56px;
+  margin-top: -56px;
+}
+</style>
+
+<script>
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.parent().addClass('active');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+});
+</script>
+
+
+<div class="container-fluid main-container">
+
+<!-- tabsets -->
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+
+
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html"> Health Insurance Coverage in the United States</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li>
+  <a href="1-interactive.html">Overview of Insurance Coverage</a>
+</li>
+<li>
+  <a href="2-nyt.html">New York Times Articles</a>
+</li>
+<li>
+  <a href="3-twitterAPI.html">Twitter API</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div class="fluid-row" id="header">
+
+
+
+<h1 class="title toc-ignore">Crime in NYC</h1>
+
+</div>
+
+
+<style type="text/css">
+.title {
+  display: none;
+}
+
+img {
+  margin: 40px;
+}
+
+</style>
+<div class="row" style="padding-top: 100px;">
+
+
+
+
+<div id="introduction" class="section level1">
+<h1>Introduction</h1>
+<div id="goals-of-the-project" class="section level2">
+<h2>Goals of the project</h2>
+<p>In this project, we present a <em>state-level overview</em> of the expansion of health insurance in the United States and its effects on health outcomes and cost outcomes, from 2008 to 2015 under President Obama’s term. One of the hallmarks of Obama’s presidency was the passage and implementation of the <strong>Affordable Care Act (ACA)</strong> to increase health insurance coverage and regulate healthcare provision to protect consumers’ rights. In addition, we are also interested in how people perceive the (ACA), as seen from articles related to the ACA from the New York Times.</p>
+<p><strong>Research Questions:</strong></p>
+<ol style="list-style-type: decimal">
+<li><p><em>Trends of health insurance expansion in the United States</em>: How has the percentage of uninsured Americans changed overall, and differentially by states, from 2008 to 2015? How has the composition of healthcare sources changed?</p></li>
+<li><p><em>Health outcomes</em>: How do the states compare in health outcomes, such as mortality rates and access to preventative and remedying treatments?</p></li>
+<li><p><em>Financial outcomes</em>: How do the states compare in financial and cost outcomes, such as the containment of out-of-pocket costs, insurance premium growth and government spending?</p></li>
+<li><p><em>Perceptions of the ACA</em>: We used API to download articles realted to ACA on New York Times from 2011-2017 and transformed them into a corpus to conduct a text analysis. How has the overall trend of public attention changed over the years, as seen by the number of articles relating to the ACA? What topics do people focus on when they discuss the ACA?</p></li>
+</ol>
+</div>
+<div id="overview-of-the-affordable-care-act-in-the-united-states" class="section level2">
+<h2>Overview of the Affordable Care Act in the United States</h2>
+<p>The <strong>Patient Protection and Affordable Care Act (ACA)</strong>, also commonly known as Obamacare, was a major and wide-sweeping healthcare reform initiative enacted by Preseident Obama. The ACA was signed into law by Obama on March 23, 2010, and changes were gradually implemented over the next few years, though the majority of the provisions went into effect only on January 1, 2014.</p>
+<p>The major goal of the ACA is to expand health insurance and healthcare access to those who otherwise did not have access, including the 45 million Americans who were uninsured before the ACA took effect. In addition, it also covers wide-ranging regulations for the protection of healthcare consumer rights. Prior to the ACA, many low-income Americans we unable to afford any health insurance, while people with disabilities and pre-existing conditions may have been denied coverage by insurerers.</p>
+<p><strong>The key provisions of the ACA include</strong></p>
+<p><em>Employer mandate</em>: Employers with more than 50 employees are required to provide health insurance to full-time workers, or would otherwise face a fine</p>
+<p><em>Individual mandate</em>: Individuals must obtain “minimum essential coverage” for healthcare, and those without health insurance must pay a fine in their annual tax returns to the IRS</p>
+<p><em>State and federal marketplaces</em>: These health insurance exchanges were set-up to enable people “shopping” for insurance to make easy comparisons among the insurance plans available, thus inreasing competition in the marketplace as well.</p>
+<p><em>Medicaid expansion</em>: The ACA expands medicaid to all individuals earning less than 138% of the federal poverty level (FPL), enabled first by federal funding and . After the Supreme Court ruled this requirement as unconstitutional (thus optional) in 2012, 31 states have elected to expand medicaid, while 19 have not.</p>
+<p><em>Federal subsidies</em> to people earning between 138% and 400% of the FPL to afford monthly health insurance premiums.</p>
+<p><em>Regulations</em> preventing insurance companies from discriminating in price and provision based on people’s age, gender, or pre-existing conditions</p>
+<p>These provisions of the ACA make health insurance accessible and affordable to people previously without coverage. In addition, people who already have health insurance would also benefit from increased choice, a cap on out-of-pocket expenses, as well as more comprehensive coverage, as insurance is now required to cover more basic treatments than before.</p>
+<p>However, this increased coverage comes at a cost of increased premium growths for consumers, and increases in federal spending. The expansion of health insurance and healthcare coverage is projected to cost of the U.S. government up to $1.34 trillion over the next decade. It is thus no surprise that the States fall on various sides of the political spectrum when it comes to support for medicaid.</p>
+</div>
+</div>
+
+
+
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
