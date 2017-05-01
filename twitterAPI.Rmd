@@ -1,0 +1,356 @@
+---
+title: "Data Visualization Final Project: \nHealth Insurance Coverage in the United
+  States"
+author: "Grace Kong, Iris Chen & Fang Liu (Group P)"
+output:
+  html_document: default
+  html_notebook: default
+---
+#Twitter API Sentiment/Text Analysis
+---
+Get some tweets from Twitter to analyze and visualize
+Set up Twitter API: Selecting data including Obamacare, ACA, Affordable Care Act, and #ACA (n=1000)
+```{r}
+library(httr)
+#library(oauth)
+library(ROAuth)
+library(twitteR)
+library(RCurl)
+library(RJSONIO)
+library(stringr)
+#secretkey
+#myapp <- oauth_app("twitter",
+                  # key = "liLn6XJFenGjtvWFwi5LnDS1M",
+                  # secret = "dsCBm9Kyaeu9GMKlM9xwKl7eKmDn6qsjP31LQtwMGkF6OQdLh6")
+#Get OAuth credentials
+#twitter_token <- oauth1.0_token(oauth_endpoints("twitter"), myapp)
+
+# Declare Twitter API Credentials
+api_key <- "liLn6XJFenGjtvWFwi5LnDS1M" # From dev.twitter.com
+api_secret <- "dsCBm9Kyaeu9GMKlM9xwKl7eKmDn6qsjP31LQtwMGkF6OQdLh6" # From dev.twitter.com
+token <- "772176811455381505-PYuNAEqhHFc02r83WS9Y5dnsZciIY5v" # From dev.twitter.com
+token_secret <- "mgRPwKeHZEw9Y486h2GMtCBxDztPfQLX1Msd5vog1hiwv" # From dev.twitter.com
+
+# Create Twitter Connection
+library("base64enc")
+setup_twitter_oauth(api_key, api_secret, token, token_secret)
+
+# Run Twitter Search. Format is searchTwitter("Search Terms", n=100, lang="en", geocode="lat,lng", also accepts since and until).
+
+tweets <- searchTwitter("Obamacare OR ACA OR 'Affordable Care Act' OR #ACA", n=1000, lang="en", since="2014-08-20")
+
+# Transform tweets list into a data frame
+tweets.df <- twListToDF(tweets)
+head(tweets.df,3)
+```
+
+Who was tweeting most in the sample we collected
+```{r, include=FALSE}
+counts=table(tweets.df$screenName)
+barplot(counts)
+# Let's do something hacky:
+# Limit the data set to show only folk who tweeted twice or more in the sample
+cc=subset(counts,counts>1)
+barplot(cc,las=2,cex.names =0.3)
+```
+
+Let's have a go at parsing some tweets, pulling out the names of folk who have been retweeted or 
+who have had a tweet sent to them:
+```{r, include=FALSE}
+tweets.df$text=sapply(tweets.df$text,function(row) iconv(row,to='UTF-8'))
+ 
+#A helper function to remove @ symbols from user names...
+trim <- function (x) sub('@','',x)
+
+#A couple of tweet parsing functions that add columns to the dataframe
+library(stringr)
+#Pull out who a message is to
+tweets.df$to=sapply(tweets.df$text,function(tweet) str_extract(tweet,"^(@[[:alnum:]_]*)"))
+tweets.df$to=sapply(tweets.df$to,function(name) trim(name))
+
+#And here's a way of grabbing who's been RT'd
+tweets.df$rt=sapply(tweets.df$text,function(tweet) trim(str_match(tweet,"^RT (@[[:alnum:]_]*)")[2]))
+
+#now we can plot a chart showing how often a particular person was RT'd in our sample.
+library(ggplot2)
+ggplot()+geom_bar(aes(x=na.omit(tweets.df$rt)))
+```
+
+
+__figure 13___
+
+Extracting the source application. (We're looking only at the iPhone and Android tweets- a much smaller number are from the web client or iPad).
+Overall, this includes 388 tweets from iPhone, and 256 tweets from Android. One consideration is what time of day the tweets occur, which we'd expect to be a "signature" of their user. Here we can certainly spot a difference:
+```{r}
+library(tidyr)
+library(dplyr)
+library(purrr)
+tweets <- tweets.df %>%
+  select(id, statusSource, text, created) %>%
+  extract(statusSource, "source", "Twitter for (.*?)<") %>%
+  filter(source %in% c("iPhone", "Android"))
+table(tweets$source)
+
+library(lubridate)
+library(scales)
+tweets %>%
+  count(source, minute = minute(with_tz(created, "EST"))) %>%
+  mutate(percent = n / sum(n)) %>%
+  ggplot(aes(minute, percent, color = source)) +
+  geom_line() +
+  scale_y_continuous(labels = percent_format()) +
+  labs(x = "Minute of day (EST)",
+       y = "% of tweets",
+       color = "")
+```
+
+
+__figure 14___
+In the remaining by-word analyses in this text, we filter these quoted tweets out (since they contain text from followers that may not be representative of original tweets. Somewhere else we can see a difference involves sharing links or pictures in tweets.
+```{r}
+tweet_picture_counts <- tweets %>%
+  filter(!str_detect(text, '^"')) %>%
+  count(source,
+        picture = ifelse(str_detect(text, "t.co"),
+                         "Picture/link", "No picture/link"))
+
+ggplot(tweet_picture_counts, aes(source, n, fill = picture)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "", y = "Number of tweets", fill = "")
+```
+
+
+__figure 15___
+Comparison of words
+Now that we're sure there's a difference, what can we say about the difference in the content? We'll use the tidytext package. We start by dividing into individual words using the unnest_tokens function, and removing some common stopwords.
+
+```{r}
+library(tidytext)
+
+reg <- "([^A-Za-z\\d#@']|'(?![A-Za-z\\d#@]))"
+tweet_words <- tweets %>%
+  filter(!str_detect(text, '^"')) %>%
+  mutate(text = str_replace_all(text, "https://t.co/[A-Za-z\\d]+|&amp;", "")) %>%
+  unnest_tokens(word, text, token = "regex", pattern = reg) %>%
+  filter(!word %in% stop_words$word,
+         str_detect(word, "[a-z]"))
+
+library(qdap)
+# Find the 20 most frequent terms: term_count
+term_count1 <- freq_terms(tweet_words$word,20)
+# Plot term_count
+plot(term_count1)
+```
+
+```{r, include=FALSE}
+android_iphone_ratios <- tweet_words %>%
+  count(word, source) %>%
+  filter(sum(n) >= 5) %>%
+  spread(source, n, fill = 0) %>%
+  ungroup() %>%
+  mutate_each(funs((. + 1) / sum(. + 1)), -word) %>%
+  mutate(logratio = log2(Android / iPhone)) %>%
+  arrange(desc(logratio))
+library(ggthemes)
+ggplot(data=android_iphone_ratios, aes(x = word, y = logratio)) +
+  geom_bar(stat = "identity") + 
+  #geom_text(aes(label=pres, , y=0.005), color="white") +
+  xlab(NULL) +  coord_flip() + theme_tufte()
+
+ggplot(data=android_iphone_ratios, aes(x = word, y = Android)) +
+  geom_bar(stat = "identity") + 
+  #geom_text(label= Android, color="red") +
+  xlab(NULL) +  coord_flip() + theme_tufte()
+
+ggplot(data=android_iphone_ratios, aes(x = word, y=iPhone)) +
+  geom_bar(stat = "identity") + 
+  #geom_text(label= Android, color="red") +
+  xlab(NULL) +  coord_flip() + theme_tufte()
+```
+
+Sentiment analysis:
+Since we've observed a difference in sentiment between the Android and iPhone tweets, let's try quantifying it. We'll work with the NRC Word-Emotion Association lexicon, available from the tidytext package, which associates words with 10 sentiments: positive, negative, anger, anticipation, disgust, fear, joy, sadness, surprise, and trust.
+```{r}
+nrc <- sentiments %>%
+  filter(lexicon == "nrc") %>%
+  dplyr::select(word, sentiment)
+nrc
+```
+
+
+To measure the sentiment of the Android and iPhone tweets, we can count the number of words in each category. (For example, we see that 41 of the 2331 words in the Android tweets were associated with "anger"). We then want to measure how much more likely the Android account is to use an emotionally-charged term relative to the iPhone account. Since this is count data, we can use a Poisson test to measure the difference:
+```{r}
+sources <- tweet_words %>%
+  group_by(source) %>%
+  mutate(total_words = n()) %>%
+  ungroup() %>%
+  distinct(id, source, total_words)
+
+by_source_sentiment <- tweet_words %>%
+  inner_join(nrc, by = "word") %>%
+  count(sentiment, id) %>%
+  ungroup() %>%
+  complete(sentiment, id, fill = list(n = 0)) %>%
+  inner_join(sources) %>%
+  group_by(source, sentiment, total_words) %>%
+  summarize(words = sum(n)) %>%
+  ungroup()
+
+head(by_source_sentiment)
+```
+
+__figure 16___
+```{r}
+library(broom)
+
+sentiment_differences <- by_source_sentiment %>%
+  group_by(sentiment) %>%
+  do(tidy(poisson.test(.$words, .$total_words)))
+
+sentiment_differences
+
+#library(reshape2)
+#df.long <- melt(by_source_sentiment)
+#df.long <- df.long[21:40,]
+ggplot(by_source_sentiment, aes(x = sentiment, y = words)) +
+  geom_bar(aes(fill=source), stat = "identity",position="dodge") + 
+  scale_fill_brewer(palette="Spectral") +
+  xlab(NULL) +  coord_flip() + theme_tufte()
+```
+
+Data Preparation using Twitter: 
+The Twitter search API does not return an exhaustive list of tweets that match your search criteria, as Twitter only makes available a sample of recent tweets. For a more comprehensive search, we will need to use the Twitter streaming API, creating a database of results and regularly updating them, or use an online service that can do this.
+Now that we have tweet texts, we need to clean them up before doing any analysis. This involves removing content, such as punctuation, that has no emotional content, and removing any content that causes errors.
+
+
+Text Cleaning
+```{r}
+library(tm)
+# build a corpus, and specify the source to be character vectors
+myCorpus <- Corpus(VectorSource(tweets.df$text))
+# convert to lower case
+# tm v0.6
+myCorpus <- tm_map(myCorpus, content_transformer(tolower))
+# tm v0.5-10
+# myCorpus <- tm_map(myCorpus, tolower)
+# remove URLs
+removeURL <- function(x) gsub("http[^[:space:]]*", "", x)
+# tm v0.6
+myCorpus <- tm_map(myCorpus, content_transformer(removeURL))
+# tm v0.5-10
+# myCorpus <- tm_map(myCorpus, removeURL)
+# remove anything other than English letters or space
+removeNumPunct <- function(x) gsub("[^[:alpha:][:space:]]*", "", x)
+myCorpus <- tm_map(myCorpus, content_transformer(removeNumPunct))
+# remove punctuation
+# myCorpus <- tm_map(myCorpus, removePunctuation)
+# remove numbers
+# myCorpus <- tm_map(myCorpus, removeNumbers)
+# add two extra stop words: "available" and "via"
+myStopwords <- c(stopwords('english'), "available", "via")
+# remove "r" and "big" from stopwords
+myStopwords <- setdiff(myStopwords, c("r", "big"))
+# remove stopwords from corpus
+myCorpus <- tm_map(myCorpus, removeWords, myStopwords)
+# remove extra whitespace
+myCorpus <- tm_map(myCorpus, stripWhitespace)
+# keep a copy of corpus to use later as a dictionary for stem completion
+myCorpusCopy <- myCorpus
+# stem words
+myCorpus <- tm_map(myCorpus, stemDocument)
+# inspect the first 5 documents (tweets)
+# inspect(myCorpus[1:5])
+# The code below is used for to make text fit for paper width
+for (i in c(1:2, 320)) {
+cat(paste0("[", i, "] "))
+writeLines(strwrap(as.character(myCorpus[[i]]), 60))
+}
+## [1] exampl call java code r
+## [2] simul mapreduc r big data analysi use flight data rblogger
+## [320] r refer card data mine now cran list mani use r function
+## packag data mine applic
+# tm v0.5-10
+# myCorpus <- tm_map(myCorpus, stemCompletion)
+# tm v0.6
+stemCompletion2 <- function(x, dictionary) {
+x <- unlist(strsplit(as.character(x), " "))
+# Unexpectedly, stemCompletion completes an empty string to
+# a word in dictionary. Remove empty string to avoid above issue.
+x <- x[x != ""]
+x <- stemCompletion(x, dictionary=dictionary)
+x <- paste(x, sep="", collapse=" ")
+PlainTextDocument(stripWhitespace(x))
+}
+#myCorpus <- lapply(myCorpus, stemCompletion2, dictionary=myCorpusCopy)
+myCorpus <- Corpus(VectorSource(myCorpus))
+
+# count frequency of "mining"
+miningCases <- lapply(myCorpusCopy,
+function(x) { grep(as.character(x), pattern = "\\<mining")} )
+sum(unlist(miningCases))
+## [1] 82
+# count frequency of "miner"
+minerCases <- lapply(myCorpusCopy,
+function(x) {grep(as.character(x), pattern = "\\<miner")} )
+sum(unlist(minerCases))
+## [1] 5
+# replace "miner" with "mining"
+myCorpus <- tm_map(myCorpus, content_transformer(gsub),
+pattern = "miner", replacement = "mining")
+
+tdm <- TermDocumentMatrix(myCorpus,
+control = list(wordLengths = c(1, Inf)))
+tdm
+## <<TermDocumentMatrix (terms: 822, documents: 320)>>
+## Non-/sparse entries: 2460/260580
+## Sparsity : 99%
+## Maximal term length: 27
+## Weighting : term frequency (tf)
+```
+
+__figure 17___
+Frequent Words and Associations
+```{r}
+term.freq <- rowSums(as.matrix(tdm))
+term.freq <- subset(term.freq, term.freq >= 15)
+df <- data.frame(term = names(term.freq), freq = term.freq)
+library(ggplot2)
+ggplot(df, aes(x = term, y = freq)) + geom_bar(stat = "identity") +
+xlab("Terms") + ylab("Count") + coord_flip()
+
+```
+
+__figure 17___
+Word Cloud
+```{r}
+#library(graph)
+#source("http://bioconductor.org/biocLite.R")
+#biocLite("Rgraphviz")
+#library("Rgraphviz")
+#plot(tdm, term = term.freq, corThreshold = 0.2, weighting = T)
+
+m <- as.matrix(tdm)
+# calculate the frequency of words and sort it by frequency
+word.freq <- sort(rowSums(m), decreasing = T)
+# colors
+library(RColorBrewer)
+pal <- brewer.pal(9, "BuGn")
+pal <- pal[-(1:4)]
+
+# plot word cloud
+library(wordcloud)
+wordcloud(words = names(word.freq), freq = word.freq, min.freq = 3,
+random.order = F, colors = pal)
+
+```
+
+
+Topic Modelling
+```{r}
+dtm <- as.DocumentTermMatrix(tdm)
+library(topicmodels)
+lda <- LDA(dtm, k = 8) # find 8 topics
+(term <- terms(lda, 6)) # first 6 terms of every topic
+
+```
+
