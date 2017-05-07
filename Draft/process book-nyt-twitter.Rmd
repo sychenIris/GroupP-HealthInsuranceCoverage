@@ -1,0 +1,191 @@
+---
+title: "process book"
+author: "Shih-Yin Chen"
+date: "May 7, 2017"
+output: html_document
+---
+
+##New York Times
+
+```{r, warning=FALSE, include=FALSE, tidy=TRUE}
+library(tm)
+library(tm.plugin.lexisnexis)
+library(readxl)
+library(gtools)  # for smartbind
+library(dplyr)   # for data_frame
+library(lubridate)   # for date formatting
+library(stringr)  
+library(tools)  # Title case
+library(quanteda)
+library(ggplot2)
+library(quanteda)
+library(stringr)
+library(tm)
+library(qdap)
+library(SnowballC)
+library(dplyr)
+library(tidytext)
+library(wordcloud)
+library(ggthemes)
+
+# Combine CSV and HTML Files
+data <- read_excel("LexisNexis/NYTimes_Metadata.xlsx")
+colnames(data) <- tolower(colnames(data))
+
+# Correct data
+data$date <- substr(parse_date_time(data$date, c("mdy")),1,10)
+data$author <- toTitleCase(tolower(data$byline))
+data$byline <- NULL
+
+## Get Text files
+source1 <- LexisNexisSource("LexisNexis/The_New_York1.html")
+source2 <- LexisNexisSource("LexisNexis/The_New_York2.html")
+
+corpus1 <- Corpus(source1, readerControl = list(language = NA))
+corpus2 <- Corpus(source2, readerControl = list(language = NA))
+
+corpus <- c(corpus1, corpus2)
+
+# Convert to quanteda corpus
+corpus <- quanteda::corpus(corpus)
+
+## Add Metadata
+# Check: match(data$headline, corpus$documents$heading)
+corpus$documents$datetimestamp <- substring(corpus$documents$datetimestamp, 1,4)
+corpus$documents$date <- corpus$documents$datetimestamp
+corpus$documents$description <- corpus$documents$id
+
+# options(width = 200)
+# kwic(corpus, "Trump")
+# 
+save(corpus, file="nytimes.rda")
+```
+
+```{r, warning=FALSE, include=FALSE, tidy=TRUE}
+load("nytimes.rda")
+dfmtotal <- dfm(corpus, remove = stopwords("english"), stem = TRUE, removePunct = TRUE, removeNumbers = TRUE, tolower = TRUE, verbose = TRUE)
+dfmtotal[, 1:5]
+head(stopwords("english"), 20)
+freq<-topfeatures(dfmtotal, 20)
+wf <- data.frame(word=names(freq), freq=freq)   
+```
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+p <- ggplot(subset(wf, freq>50), aes(word, freq))    
+p <- p + geom_bar(stat="identity")
+p <- p + geom_text(aes(label=freq), vjust=-0.2)+ scale_x_discrete(limits= wf$word)   
+p <- p + theme(axis.text.x=element_text(angle=45, hjust=1), plot.title = element_text(face="bold", hjust = 0.5, size = 12))+ggtitle("Word Frequency from Articles on ACA, 2011-2017")+theme_tufte()+ylab("Frequency of Stem") + xlab("Top 30 Used Stem")
+p
+```
+
+##Twitter API 
+
+Get some tweets from Twitter to analyze and visualize
+Set up Twitter API: Selecting data including Obamacare, ACA, Affordable Care Act, and #ACA (n=1000)
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+library(httr)
+#library(oauth)
+library(ROAuth)
+library(twitteR)
+library(RCurl)
+library(RJSONIO)
+library(stringr)
+#secretkey
+#myapp <- oauth_app("twitter",
+                  # key = "liLn6XJFenGjtvWFwi5LnDS1M",
+                  # secret = "dsCBm9Kyaeu9GMKlM9xwKl7eKmDn6qsjP31LQtwMGkF6OQdLh6")
+#Get OAuth credentials
+#twitter_token <- oauth1.0_token(oauth_endpoints("twitter"), myapp)
+
+# Declare Twitter API Credentials
+api_key <- "liLn6XJFenGjtvWFwi5LnDS1M" # From dev.twitter.com
+api_secret <- "dsCBm9Kyaeu9GMKlM9xwKl7eKmDn6qsjP31LQtwMGkF6OQdLh6" # From dev.twitter.com
+token <- "772176811455381505-PYuNAEqhHFc02r83WS9Y5dnsZciIY5v" # From dev.twitter.com
+token_secret <- "mgRPwKeHZEw9Y486h2GMtCBxDztPfQLX1Msd5vog1hiwv" # From dev.twitter.com
+
+# Create Twitter Connection
+library("base64enc")
+setup_twitter_oauth(api_key, api_secret, token, token_secret)
+
+# Run Twitter Search. Format is searchTwitter("Search Terms", n=100, lang="en", geocode="lat,lng", also accepts since and until).
+
+tweets <- searchTwitter("Obamacare OR ACA OR 'Affordable Care Act' OR #ACA", n=1000, lang="en", since="2014-08-20")
+
+# Transform tweets list into a data frame
+tweets.df <- twListToDF(tweets)
+head(tweets.df,3)
+```
+
+Who was tweeting most in the sample we collected
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+counts=table(tweets.df$screenName)
+barplot(counts)
+# Let's do something hacky:
+# Limit the data set to show only folk who tweeted twice or more in the sample
+cc=subset(counts,counts>1)
+barplot(cc,las=2,cex.names =0.3)
+```
+
+Let's have a go at parsing some tweets, pulling out the names of folk who have been retweeted or 
+who have had a tweet sent to them:
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+tweets.df$text=sapply(tweets.df$text,function(row) iconv(row,to='UTF-8'))
+ 
+#A helper function to remove @ symbols from user names...
+trim <- function (x) sub('@','',x)
+
+#A couple of tweet parsing functions that add columns to the dataframe
+library(stringr)
+#Pull out who a message is to
+tweets.df$to=sapply(tweets.df$text,function(tweet) str_extract(tweet,"^(@[[:alnum:]_]*)"))
+tweets.df$to=sapply(tweets.df$to,function(name) trim(name))
+
+#And here's a way of grabbing who's been RT'd
+tweets.df$rt=sapply(tweets.df$text,function(tweet) trim(str_match(tweet,"^RT (@[[:alnum:]_]*)")[2]))
+
+#now we can plot a chart showing how often a particular person was RT'd in our sample.
+library(ggplot2)
+ggplot()+geom_bar(aes(x=na.omit(tweets.df$rt)))
+```
+
+
+__figure 13___
+
+Extracting the source application. (We're looking only at the iPhone and Android tweets- a much smaller number are from the web client or iPad).
+Overall, this includes 388 tweets from iPhone, and 256 tweets from Android. One consideration is what time of day the tweets occur, which we'd expect to be a "signature" of their user. Here we can certainly spot a difference:
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyr)
+library(dplyr)
+library(purrr)
+tweets <- tweets.df %>%
+  select(id, statusSource, text, created) %>%
+  extract(statusSource, "source", "Twitter for (.*?)<") %>%
+  filter(source %in% c("iPhone", "Android"))
+table(tweets$source)
+
+library(lubridate)
+library(scales)
+tweets %>%
+  count(source, minute = minute(with_tz(created, "EST"))) %>%
+  mutate(percent = n / sum(n)) %>%
+  ggplot(aes(minute, percent, color = source)) +
+  geom_line() +
+  scale_y_continuous(labels = percent_format()) +
+  labs(x = "Minute of day (EST)",
+       y = "% of tweets",
+       color = "")
+```
+
+__figure 14___
+In the remaining by-word analyses in this text, we filter these quoted tweets out (since they contain text from followers that may not be representative of original tweets. Somewhere else we can see a difference involves sharing links or pictures in tweets.
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+tweet_picture_counts <- tweets %>%
+  filter(!str_detect(text, '^"')) %>%
+  count(source,
+        picture = ifelse(str_detect(text, "t.co"),
+                         "Picture/link", "No picture/link"))
+
+ggplot(tweet_picture_counts, aes(source, n, fill = picture)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "", y = "Number of tweets", fill = "")
+```
