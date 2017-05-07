@@ -5,7 +5,8 @@ QMSS 4063: Data Visualization
 ----
 Final Project - Project Idea
 ----
-
+##Final Project Link:
+https://columbia-university-qmss.github.io/GroupP-Final/
 
 #### Abstract: We are interested in finding out how health insurance coverage in the USA differs from state to state, its relationship to indicators of health performance, and whether it can be predicted by political factors. We will explore the following questions:
 
