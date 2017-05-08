@@ -1,0 +1,656 @@
+---
+title: "Data Visualization Final Project: \nHealth Insurance Coverage in the United States"
+author: "Grace Kong, Iris Chen & Fang Liu (Group P)"
+output:
+  html_document: default
+  html_notebook: default
+---
+   
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+rm(list=ls())
+
+library(leaflet)
+library(maps)
+library(rgdal)
+library(DT)
+library(ggplot2)
+library(ggthemes)
+library(plotly)
+library(magrittr)
+library(readxl)
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(stringi)
+library(RColorBrewer)
+library(countrycode)
+require(gridExtra)
+```
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+## IMPORT DATA
+
+# General ACA information
+aca_general_raw <- read_excel("Data/states_aca_general.xlsx", sheet=2, col_names=FALSE)
+
+# States health outcomes
+health_ind_raw <- read_excel("Data/states_health_ind.xlsx", sheet=4, col_names=FALSE)
+
+# Insurance coverage data
+  # Long format
+insurance_long <- read_excel("Data/insurance-clean.xlsx", sheet=1, col_names=TRUE)
+  # Wide format
+insurance <- read_excel("Data/insurance-clean.xlsx", sheet=2, col_names=TRUE)
+
+# Demographic information
+demographics1 <- read.csv("Data/Population_Age_Income.csv", header = TRUE)
+  # Provided with Assignment 4 (want the yearly population data)
+demographics2 <- read_excel("Data/PopulationEstimates.xls")
+
+# Election Results
+election <- read_excel("Data/US_Presidential_Results_by_State_1828-2016.xlsx", sheet=2, col_names=FALSE)
+```
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+## CLEAN DATA
+
+# List of states abbreviations
+state_abbreviations <- c("AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY")
+
+
+## CLEAN INSURANCE RATES DATA (WIDE)
+
+# Drop unnecessary columns
+insurance <- insurance[1:50, -1]
+
+# Rename variables
+colnames(insurance) <- c("state_abb", "state", "uninsured_num_2008", "uninsured_pct_2008", "uninsured_num_2009", "uninsured_pct_2009", "uninsured_num_2010", "uninsured_pct_2010", "uninsured_num_2011", "uninsured_pct_2011", "uninsured_num_2012", "uninsured_pct_2012", "uninsured_num_2013", "uninsured_pct_2013", "uninsured_num_2014", "uninsured_pct_2014", "uninsured_num_2015", "uninsured_pct_2015")
+
+# Create variables for insurance rates
+insurance$insured_pct_2008 <- 100 - insurance$uninsured_pct_2008
+insurance$insured_pct_2009 <- 100 - insurance$uninsured_pct_2009
+insurance$insured_pct_2010 <- 100 - insurance$uninsured_pct_2010
+insurance$insured_pct_2011 <- 100 - insurance$uninsured_pct_2011
+insurance$insured_pct_2012 <- 100 - insurance$uninsured_pct_2012
+insurance$insured_pct_2013 <- 100 - insurance$uninsured_pct_2013
+insurance$insured_pct_2014 <- 100 - insurance$uninsured_pct_2014
+insurance$insured_pct_2015 <- 100 - insurance$uninsured_pct_2015
+
+# Reorder variables
+insurance <- insurance[ , c("state_abb", "state", "uninsured_num_2008", "uninsured_pct_2008", "insured_pct_2008", "uninsured_num_2009", "uninsured_pct_2009", "insured_pct_2009", "uninsured_num_2010", "uninsured_pct_2010", "insured_pct_2010", "uninsured_num_2011", "uninsured_pct_2011", "insured_pct_2011", "uninsured_num_2012", "uninsured_pct_2012", "insured_pct_2012", "uninsured_num_2013", "uninsured_pct_2013", "insured_pct_2013", "uninsured_num_2014", "uninsured_pct_2014", "insured_pct_2014", "uninsured_num_2015", "uninsured_pct_2015", "insured_pct_2015")]
+
+
+## CLEAN INSURANCE RATES DATA (LONG)
+
+# Rename variables
+colnames(insurance_long) <- c("year", "state", "population", "uninsured_num", "uninsured_pct", "insured_num", "insured_pct")
+
+# Add state abbreviations
+  # First create a look-up table (based on wide data)
+state_abb_lookup <- insurance[ , c("state", "state_abb")]
+  # Then do the matching
+insurance_long$state_abb <- state_abb_lookup$state_abb[match(insurance_long$state, state_abb_lookup$state)]
+  # Reorder variable
+insurance_long <- insurance_long[ , c(1:2, ncol(insurance_long), 3:(ncol(insurance_long)-1))]
+
+# Order observations (by state, then by year)
+insurance_long <- insurance_long[order(insurance_long$state, insurance_long$year), ]
+
+
+## CLEAN ACA GENERAL DATA
+
+# Keep only relevant rows and columns
+aca_general <- aca_general_raw[6:57, 1:73]
+
+# Label variables for ACA general data
+names(aca_general) <- c("state", "unins_all_pct_10", "unins_all_pct_15", "unins_all_decr_pct", "unins_all_decr", "cov_emp", "cov_parents_plan", "lifetime_lim_preACA_tot", "lifetime_lim_preACA_child", "lifetime_lim_preACA_adultM", "lifetime_lim_preACA_adultF", "cov_private_tot", "cov_private_child", "cov_private_adultM", "cov_private_adultF", "premium_emp_avg_growth_pct_00to10", "premium_emp_avg_growth_pct_10to15", "premium_emp_savings_15", "premium_emp_savings_16", "MLR_rebate_beneficiaries_12", "MLR_rebate_amt_12", "MLR_rebate_beneficiaries_13", "MLR_rebate_amt_13", "MLR_rebate_beneficiaries_14", "MLR_rebate_amt_14", "MLR_rebate_beneficiaries_15", "MLR_rebate_amt_15", "MLR_rebate_amt_12to15", "medicaid_enroll_13", "medicaid_enroll_16", "medicaid_enroll_child_13", "medicaid_enroll_incr_13to16", "medicaid_full_duals", "medicaid_partial_duals", "medicaid_full_or_partial_duals", "state_has_expanded", "insurance_incr_medicaid", "cholest_scr_incr_medicaid", "mammogram_incr_medicaid", "papsmear_incr_medicaid", "clinic_care_incr_medicaid", "all_care_incr_medicaid", "phycisian_visit_ann_incr_medicaid", "depression_decr_medicaid", "good_health_incr_medicaid", "deaths_ann_decr_medicaid", "catastrophic_oop_ann_decr_medicaid", "indebted_ppl_decr_medicaid", "fed_spending_net_incr_inMil", "uncompensated_care_decr_inMil", "mental_substance_elig_medicaid_share", "mental_substance_elig_medicaid", "preexisting_condition_09", "cov_mkt_plan_16", "cov_mkt_16", "receive_tax_credit", "avg_tax_credit", "receive_cost_sharing", "avg_num_mkt_plans_avail_17", "cov_mkt_under75D_pct", "cov_mkt_under100D_pct", "cov_offmkt_elig_tax_credit", "rate_review_funds_to_state", "HIECP_grant_award_to_state", "medicare_enroll_16", "medicare_benef_donuthole", "medicare_benef_donuthole_savings_tot", "medicare_benef_donuthole_savings_avg", "medicare_partB_free_prev_services", "medicare_partB_free_prev_services_share", "medicare_incr_readmit_rate", "medicare_avoided_readmit", "accountable_care_org_num")
+
+# Trim white space on state variable
+aca_general$state <- stri_trim_both(aca_general$state)
+
+# Change format of variables
+  # Apart from T/F variable for "state has expanded"
+aca_general$state_has_expanded[aca_general$state_has_expanded=="yes"] <- TRUE 
+aca_general$state_has_expanded[aca_general$state_has_expanded=="no"] <- FALSE 
+  # Convert others to numeric form
+for (j in c(2:35, 37:73)) {
+  aca_general[[j]] <- as.numeric(aca_general[[j]])
+}
+
+# Save USA data separately
+aca_general_USA <- aca_general[aca_general$state=="United States", ]
+
+# Drop USA and DC data
+aca_general <- aca_general[!(aca_general$state %in% c("United States", "District of Columbia")), ]
+
+# Add state abbreviations
+aca_general$state_abb <- state_abbreviations
+aca_general <- aca_general[ , c(1, ncol(aca_general), 2:(ncol(aca_general)-1))]
+
+# Drop raw data
+rm(aca_general_raw)
+
+
+## CLEAN HEALTH INDICATOR DATA
+
+# Keep only relevant rows and columns
+health_ind <- health_ind_raw[4:6703, c(1, 3:6)]
+
+# Label variables
+names(health_ind) <- c("state", "measure", "year", "rate", "rank")
+
+# Simplify date (years) - only keep last year if range was given
+health_ind$year[health_ind$year=="07/2009 - 06/2012"] <- "2012"
+health_ind$year[health_ind$year=="07/2010 - 06/2013"] <- "2013"
+health_ind$year[health_ind$year=="07/2012 - 06/2015"] <- "2015"
+health_ind$year[health_ind$year=="10/2013-9/2014"] <- "2014"
+health_ind$year[health_ind$year=="2008-09"] <- "2009"
+health_ind$year[health_ind$year=="2010-11"] <- "2011"
+health_ind$year[health_ind$year=="2011-12"] <- "2012"
+health_ind$year[health_ind$year=="2011/12"] <- "2012"
+health_ind$year[health_ind$year=="2012-13"] <- "2013"
+health_ind$year[health_ind$year=="2013-14"] <- "2014"
+health_ind$year[health_ind$year=="2013(Q2-Q4)"] <- "2013"
+health_ind$year[health_ind$year=="2014-15"] <- "2015"
+health_ind$year[health_ind$year=="2015(Q2-Q4)"] <- "2015"
+
+# Export to excel to manually label variable names
+unique_measures <- unique(as.factor(health_ind$measure))
+  # Copied in from excel sheet
+unique_measures_relabelled <- c("a.summary_access", "a.unins_adult", "a.unins_child", "a.no_care_bc_cost_adult", "a.high_OOP_relative_under65", "a.at_risk_no_routine_doc_adult", "a.no_dental_adult", "q.summary_prev_treat", "q.with_usual_care_adult", "q.with_cancer_screening_adult", "q.with_vaccines_adult", "q.with_medical_home_child", "q.with_prev_medical_dental_child", "q.with_mental_healthcare_child", "q.with_vaccines_infant", "q.drug_should_avoid_medicare", "q.drug_should_avoid_3conditions_medicare", "q.good_health_provider_medicare", "q.mortality_4conditions_medicare", "q.CLABSI_infection_ratio", "q.info_recovery_hospitalized", "q.good_hospital_staff_hospitalized", "q.improve_mobility_homehealth", "q.improved_wounds_homehealth", "q.sores_NHres", "q.antipsychotic_med_NHres", "u.summary_avoidable_hosp_cost", "u.hosp_asthma_child", "u.hosp_ambulatory_65to74yrs", "u.hosp_ambulatory_above75yrs", "u.30day_hosp_readmit_medicare", "u.30day_hosp_readmit_NHres", "u.hosp_6mos_NHres", "u.hosp_medicare_homehealth", "u.avoidable_ER_medicare", "u.tot_reimb_employer_ins", "u.tot_reimb_medicare", "h.summary_healthy_lives", "h.deaths_amenable", "h.yrs_lost_potential_life_before75", "h.deaths_breast_cancer_F", "h.deaths_colorectal_cancer", "h.deaths_suicide", "h.deaths_infant_mortality", "h.poor_health_adult", "h.smoke_adult", "h.obese_adult", "h.obese_child", "h.poor_dental_adult", "u.premium_emp_private", "u.premium_emp_private_unadj", "u.reimb_medicare_unadj", "u.deaths_amenable_black", "u.deaths_amenable_white", NA, "q.with_prev_screening_above50yrs", NA)
+
+# Replace variable names with abbreviated version
+for (i in 1:57) {
+  health_ind$measure <- replace(health_ind$measure, health_ind$measure==unique_measures[i], unique_measures_relabelled[i])
+}
+
+# Remove the NA's
+health_ind <- health_ind[!is.na(health_ind$measure), ]
+
+# Remove duplicates
+  # By state, measure.year
+health_ind <- health_ind[!duplicated(health_ind[ , 1:3]), ]
+
+# Interact measure and year
+health_ind$measure_year <- interaction(health_ind$measure, health_ind$year)
+
+# Convert to character variable
+health_ind$measure_year <- as.character(health_ind$measure_year)
+
+# Pre-reshape: Store existing data as "long"
+health_ind_long <- health_ind
+
+# Reshape wide
+health_ind <- as.data.frame(cbind(health_ind$state, health_ind$measure_year, health_ind$rate))
+  # Drop rank data for now
+names(health_ind) <- c("state", "measure_year", "rate")
+health_ind <- reshape(health_ind,
+                        idvar = "state",
+                        timevar = "measure_year",
+                        direction = "wide")
+
+# Drop "rate" from the name
+names(health_ind)[2:ncol(health_ind)] <- substr(names(health_ind), 6, nchar(names(health_ind)))[2:ncol(health_ind)]
+
+# Drop variables who have all entries as NA
+  # Due to 'unbalanced panel' in reshaping
+  # First create a vector to record if variable is all NA
+variable_all_NA <- vector(mode="logical", length=ncol(health_ind))
+for (j in 1:ncol(health_ind)) {
+  if(sum(is.na(health_ind[[j]]))==52) {
+    variable_all_NA[j] <- TRUE
+  }
+}
+  # Only keep the variables that are NOT all NA
+health_ind <- health_ind[ , !variable_all_NA]
+
+# Change format of variables
+  # To character variable
+health_ind$state <- as.character(health_ind$state)
+  # To numeric variable
+for (j in c(2:164)) {
+  health_ind[[j]] <- as.character(health_ind[[j]])
+  health_ind[[j]] <- as.numeric(health_ind[[j]])
+}
+
+# Save USA data separately
+health_ind_USA <- health_ind[health_ind$state=="United States", ]
+
+# Drop USA and DC data
+health_ind <- health_ind[!(health_ind$state %in% c("United States", "District of Columbia")), ]
+
+# Label state abbreviations
+health_ind$state_abb <- state_abbreviations
+health_ind <- health_ind[ , c(1, ncol(health_ind), 2:(ncol(health_ind)-1))]
+
+# Drop raw data
+rm(health_ind_raw)
+
+
+## CLEAN DEMOGRAPHIC (1) DATA
+
+# Drop unnecessary row and column
+demographics1 <- demographics1[-1,-1]
+
+# Rename variables
+colnames(demographics1) <- c("state","income","population", "ppl_age0to4","ppl_age5to9","ppl_age10to14","ppl_age15to19","ppl_age20to24", "ppl_age25to29","ppl_age30to34","ppl_age35to39","ppl_age40to44", "ppl_age45to49","ppl_age50to54","ppl_age55to59","ppl_age60to64", "ppl_age65to69","ppl_age70to74","ppl_age75to79","ppl_age80to84","ppl_age85plus")
+
+# Drop observations DC and PR
+demographics1 <- demographics1[!demographics1$state=="District of Columbia" & !demographics1$state=="Puerto Rico", ]
+
+# Label state abbreviations
+demographics1$state_abb <- state_abbreviations
+demographics1 <- demographics1[ , c(1, ncol(demographics1), 2:(ncol(demographics1)-1))]
+
+# Change format of variables
+  # To character variable
+demographics1$state <- as.character(demographics1$state)
+  # To numeric variable
+for (j in c(3:ncol(demographics1))) {
+  demographics1[[j]] <- as.character(demographics1[[j]])
+  demographics1[[j]] <- as.numeric(demographics1[[j]])
+}
+
+# BEA regions
+demographics1$BEA_region <- ""
+demographics1$BEA_region[demographics1$state_abb %in% c("ME", "NH", "VT", "MA", "CT", "RI")] <- "New England"
+demographics1$BEA_region[demographics1$state_abb %in% c("NY", "NJ", "PA", "MD", "DE")] <- "Mideast"
+demographics1$BEA_region[demographics1$state_abb %in% c("WI", "IL", "MI", "IN", "OH")] <- "Great Lakes"
+demographics1$BEA_region[demographics1$state_abb %in% c("WV", "KY", "VA", "TN", "NC", "SC", "AR", "LA", "MS", "AL", "GA", "FL")] <- "Southeast"
+demographics1$BEA_region[demographics1$state_abb %in% c("ND", "SD", "NE", "KS", "MN", "IA", "MO")] <- "Plains"
+demographics1$BEA_region[demographics1$state_abb %in% c("MT", "ID", "WY", "UT", "CO")] <- "Rocky Mountains"
+demographics1$BEA_region[demographics1$state_abb %in% c("AZ", "NM", "TX", "OK")] <- "Southwest"
+demographics1$BEA_region[demographics1$state_abb %in% c("WA", "OR", "CA", "NV", "AK", "HI")] <- "Far West"
+
+# Tag income level (category)
+demographics1$income_level <- ""
+demographics1$income_level[demographics1$income >= 60000] <- "High"
+demographics1$income_level[demographics1$income >= 50000 & demographics1$income < 60000] <- "Upper Middle"
+demographics1$income_level[demographics1$income >= 45000 & demographics1$income < 50000] <- "Lower Middle"
+demographics1$income_level[demographics1$income < 45000] <- "Low"
+  # Convert to factor variable
+demographics1$income_level <- factor(demographics1$income_level, levels = c("Low", "Lower Middle", "Upper Middle", "High"))
+
+
+## CLEAN DEMOGRAPHIC (2) DATA
+
+colnames(demographics2) <- demographics2[2, ]
+
+# Drop first few rows (non-observations)
+demographics2 <- demographics2[-(1:2), ]
+
+# Drop county-level data,  keep state-level data only
+demographics2 <- demographics2[demographics2$Area_Name == "United States" | demographics2$State != lag(demographics2$State), ]
+
+# Keep only columns of population from 2010 to 2015
+demographics2 <- demographics2[ , c("State", "Area_Name", "POP_ESTIMATE_2010", "POP_ESTIMATE_2011", "POP_ESTIMATE_2012", "POP_ESTIMATE_2013", "POP_ESTIMATE_2014", "POP_ESTIMATE_2015")]
+
+# Change format of variables
+  # To character variable
+for (j in c(3:8)) {
+  demographics2[[j]] <- as.numeric(demographics2[[j]])
+}
+
+# Rename variables
+colnames(demographics2) <- c("state_abb", "state", "population_2010", "population_2011", "population_2012", "population_2013", "population_2014", "population_2015")
+
+
+## CLEAN ELECTION DATA
+
+# Keep only 2012 and 2008 data, and data for the 50 states
+election <- election[ 4:53 , c("X0", "X5", "X6", "X9", "X10")]
+
+# Rename variables
+colnames(election) <- c("state", "Dem_pct_2012", "Rep_pct_2012", "Dem_pct_2008", "Rep_pct_2008")
+
+# Add state abbreviations
+  # Match with look-up table
+election$state_abb <- state_abb_lookup$state_abb[match(election$state, state_abb_lookup$state)]
+
+# Change format of variables
+  # To numeric variable
+for (j in c(4:6)) {
+  election[[j]] <- as.numeric(election[[j]])
+}
+
+# Calculate winning party for each state
+election$party_2012 <- ifelse(election$Dem_pct_2012 > election$Rep_pct_2012, "Democratic", "Republican")
+election$party_2008 <- ifelse(election$Dem_pct_2008 > election$Rep_pct_2008, "Democratic", "Republican")
+
+# Reorder variables
+election <- election[ , c("state", "state_abb", "Dem_pct_2012", "Rep_pct_2012", "party_2012", "Dem_pct_2008", "Rep_pct_2008", "party_2008")]
+```
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+## SOME DATA PREPARATION
+
+# Look-up information into insurance and insurance_long, on:
+  # Party (2012)
+insurance_long$party_2012 <- election$party_2012[match(insurance_long$state, election$state)]
+insurance$party_2012 <- election$party_2012[match(insurance$state, election$state)]
+  # BEA region
+insurance_long$BEA_region <- demographics1$BEA_region[match(insurance_long$state, demographics1$state)]
+insurance$BEA_region <- demographics1$BEA_region[match(insurance$state, demographics1$state)]
+  # Income level
+insurance_long$income_level <- demographics1$income_level[match(insurance_long$state, demographics1$state)]
+insurance$income_level <- demographics1$income_level[match(insurance$state, demographics1$state)]
+
+# Also find nation-wide trend for insurance
+insurance_long_US <- data.frame("year" = c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015), "uninsured_pct" = c(16.8, 17.5, 18.2, 17.2, 16.9, 16.6, 13.3, 10.5))
+```
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+## PREPARATION FOR FURTHER PLOTS (INCLUDING DATA TABLE)
+
+# Want to combine information on insurance coverage with key information on health outcomes/access and affordability
+
+key_indicators <- state_abb_lookup
+
+## Merge in information to the data table on the following
+
+# Demographic Information
+  # Income level
+key_indicators$income_level <- demographics1$income_level[match(key_indicators$state_abb, demographics1$state_abb)]
+
+# Insurance Coverage
+  # Percentage insured (2015)
+key_indicators$insured_pct_2015 <- insurance$insured_pct_2015[match(key_indicators$state_abb, insurance$state_abb)]
+  # Percentage insured (2014)
+key_indicators$insured_pct_2014 <- insurance$insured_pct_2014[match(key_indicators$state_abb, insurance$state_abb)]
+  # Indicator: Whether state has expanded medicare
+key_indicators$state_has_expanded <- aca_general$state_has_expanded[match(key_indicators$state_abb, aca_general$state_abb)]
+
+# Health outcomes and access
+  # Mortality amenable to health care, deaths per 10000 population
+key_indicators$deaths_amenable_2014 <- health_ind$h.deaths_amenable.2014 [match(key_indicators$state_abb, health_ind$state_abb)]
+  # Years of Potential Life Lost before 75
+key_indicators$years_life_lost <- health_ind$h.yrs_lost_potential_life_before75.2014 [match(key_indicators$state_abb, health_ind$state_abb)]
+  # Adults with a usual source of care (%)
+key_indicators$usual_care_2015 <- health_ind$q.with_usual_care_adult.2015 [match(key_indicators$state_abb, health_ind$state_abb)]
+  # Adults with age/gender-appropriate cancer screenings (%)
+key_indicators$with_cancer_screening <- health_ind$q.with_cancer_screening_adult.2014 [match(key_indicators$state_abb, health_ind$state_abb)]
+  # Adults with age-appropriate vaccines (%)
+key_indicators$with_vaccines <- health_ind$q.with_vaccines_adult.2015 [match(key_indicators$state_abb, health_ind$state_abb)]
+
+# Affordability and cost-efficiency
+  # Individuals under age 65 with high OOP medical costs relative to annual household income
+key_indicators$high_OOP_relative <- health_ind$a.high_OOP_relative_under65.2015 [match(key_indicators$state_abb, health_ind$state_abb)]
+  # Average annual growth in family premiums for employer coverage (between 2010 and 2015)
+key_indicators$premium_ann_growth_10_15 <- aca_general$premium_emp_avg_growth_pct_10to15[match(key_indicators$state_abb, aca_general$state_abb)]
+  # Marketplace consumers who could select a plan for less than $100
+key_indicators$IM_plan_under_100 <- aca_general$cov_mkt_under100D_pct[match(key_indicators$state_abb, aca_general$state_abb)]
+  # Net increase in federal spending (millions)
+key_indicators$incr_fed_spending_mil <- aca_general$fed_spending_net_incr_inMil[match(key_indicators$state_abb, aca_general$state_abb)]
+```
+
+In this section, we are interested in investigating the how states' insurance coverage relates to two broad classes of outcomes - __health outcomes__ and __cost containment outcomes__. We anticipate that an increase in health insurance coverage in a state would be correlated with increased health (though there is unlikely to be a significant causal relationship due to the short time span since the ACA went into effect). Moreover, an increase in health insurance coverage would likely shift some of the financial burden from individual out of pocket (OOP) costs to the premiums paid (pooled risk) and to the state.
+
+We are interested in finding out which states perform well in which outcomes, as well as eventually develop an indicator of how states fare _overall_.
+
+
+
+# Health Outcomes and Access
+
+__Figure 8__
+
+We explore how health insurance rates correlates with health outcomes. In particular, we can look at the measure of mortality amenable to healthcare intervention - the number of deaths that could have been prevented by healthcare in the year 2014. We plot avoidable mortality (2014) against insurance rates (2014) and observe a negative relationship as expected. States that have higher rates of insurance also have better health in this respect. However, we also control for income levels as low income levels would be a major predictor of poor health, as confirmed in our plot. Yet, within each income level, the negative relationship remains, and it is especially pronounced among the upper-middle income countries. 
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+## PLOT 8
+plot8 <- (ggplot(key_indicators, aes(insured_pct_2014, deaths_amenable_2014))
+          + geom_smooth(aes(color = income_level, group = income_level), method = "lm", lwd = 1, se = FALSE)
+          + geom_smooth(color = "black", method = "lm", linetype = 2, lwd = 1, se = FALSE)
+          + geom_point(aes(color = income_level, shape = state_has_expanded), size = 2)
+          + geom_text(aes(label = state_abb), nudge_x = 0.5, nudge_y = 1.5, check_overlap = TRUE, size = 2.5, color = "gray30")
+          + labs(x = "% Insured", y = "Deaths Preventable by Healthcare Intervention \n(per 100,000 People)", color = "Income \nLevel", shape = "State has \nExpanded \nMedicaid")
+          + scale_color_manual(values = brewer.pal(n = 4, name = "Dark2"))
+          + ggtitle("Relationship Between Avoidable Mortality and \nHealth Insurance Coverage Among States")
+          + theme_minimal()
+          + theme(plot.title = element_text(face="bold", hjust = 0.5, size = 12)))
+plot8
+```
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+## DATA PROCESSING FOR MAPS
+
+# Obtain shape files of US states
+map_states = map("state", fill = TRUE, plot = FALSE)
+
+# Standardize name format with rest of assignment
+  # Function to conver to proper case
+properCase <- function(x) {
+  s <- strsplit(x, " ")[[1]]
+  paste(toupper(substring(s, 1,1)), substring(s, 2),
+      sep="", collapse=" ")
+}
+  # Convert to proper case
+map_states$state <- sapply(map_states$names, properCase)
+  # Rename the main component of states with multiple parts in the map
+map_states$state[map_states$state == "Massachusetts:main"] <- "Massachusetts"
+map_states$state[map_states$state == "Michigan:south"] <- "Michigan"
+map_states$state[map_states$state == "New York:main"] <- "New York"
+map_states$state[map_states$state == "North Carolina:main"] <- "North Carolina"
+map_states$state[map_states$state == "Virginia:main"] <- "Virginia"
+map_states$state[map_states$state == "Washington:main"] <- "Washington"
+  # Match with state abbreviations
+map_states$state_abb <- state_abb_lookup$state_abb[match(map_states$state, state_abb_lookup$state)]
+  # Then strip off all the extra location information for states with multiple parts (leaving just the state name)
+for (i in 1:length(map_states$state)) {
+  map_states$state[i] <- unlist(strsplit(map_states$state[i], ":"))[1]
+}
+
+# Get coordinates of state centers
+states_centers <- state.center
+state.center <- cbind(states_centers, state_abb_lookup)
+
+# Health outcomes: Import key indicators data, matched by state
+    # Remember to later match information based on state, not state abbreviation (due to how we labelled above)
+map_states$deaths_amenable_2014 <- key_indicators$deaths_amenable_2014[match(map_states$state, key_indicators$state)]
+map_states$usual_care_2015 <- key_indicators$usual_care_2015[match(map_states$state, key_indicators$state)]
+map_states$with_cancer_screening <- key_indicators$with_cancer_screening[match(map_states$state, key_indicators$state)]
+map_states$with_vaccines <- key_indicators$with_vaccines[match(map_states$state, key_indicators$state)]
+
+# Cost outcomes: Import key indicators data, matched by state
+    # Remember to later match information based on state, not state abbreviation (due to how we labelled above)
+map_states$high_OOP_relative <- key_indicators$high_OOP_relative[match(map_states$state, key_indicators$state)]
+map_states$premium_ann_growth_10_15 <- key_indicators$premium_ann_growth_10_15[match(map_states$state, key_indicators$state)]
+map_states$IM_plan_under_100 <- key_indicators$IM_plan_under_100[match(map_states$state, key_indicators$state)]
+map_states$incr_fed_spending_mil <- key_indicators$incr_fed_spending_mil[match(map_states$state, key_indicators$state)]
+```
+
+__Figure 9__
+
+The following maps how the states performed in the following health outcomes:
+
+1) Preventable mortality - deaths amenable to healthcare intervention, per 100,000 population (2014)
+
+2) Adults with access to a usual source of care (2015)
+
+3) Rate of age- and gender-appropriate cancer screenings in adults
+
+4) Rate of age-appropriate vaccinations in adults (2014)
+
+A green color always incidates a comparatively more favorable outcome, while a red color indicates a less favorable outcome (2015)
+
+We note that the Northeast (New England) states perform consistently well across all health outcomes, while the Southeast states, as well as Texes, peform consistently poorly on all except for vaccination rates. The Western and Rocky Mountains states have a low avoidable mortality rate, despite having low rates of access to usual care and of cancer screening and vaccinations. In the measure of adult vaccination rates, the trend of the South faring poorer on health is reversed, as they do comparatively well in vaccinations.
+  
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+## PLOT 9: LEAFLET MAP - HEALTH OUTCOMES
+(leaflet(map_states) %>% 
+    setView(lat=39.8282, lng=-96 , zoom=4) %>%
+    addPolygons(color = "#333333", weight = 1, smoothFactor = 0.5, fillOpacity = 0) %>%
+    addPolygons(group = "Preventable Deaths (2014)", fillColor = ~colorQuantile("RdYlGn", -deaths_amenable_2014)(-deaths_amenable_2014), smoothFactor = 0.5, stroke = FALSE, fillOpacity = 0.6, popup = paste("<b>State: </b>", map_states$state, "<br/>", "<b>Preventable Mortality</b>", "<br/>", "<b>per 100,000: </b>", map_states$deaths_amenable_2014)) %>%
+    addPolygons(group = "Access to Usual Care (2015)", fillColor = ~colorQuantile("RdYlGn", usual_care_2015)(usual_care_2015), smoothFactor = 0.5, stroke = FALSE, fillOpacity = 0.6, popup = paste("<b>State: </b>", map_states$state, "<br/>", "<b>Access to Usual</b>", "<br/>", "<b>Source of Care: </b>", map_states$usual_care_2015, "%")) %>%
+    addPolygons(group = "Cancer Screenings Rate (2014)", fillColor = ~colorQuantile("RdYlGn", with_cancer_screening)(with_cancer_screening), smoothFactor = 0.5, stroke = FALSE, fillOpacity = 0.6, popup = paste("<b>State: </b>", map_states$state, "<br/>", "<b>Cancer Screenings</b>", "<br/>", "<b>Rate: </b>", map_states$with_cancer_screening, "%")) %>%
+    addPolygons(group = "Adult Vaccination Rate (2015)", fillColor = ~colorQuantile("RdYlGn", with_vaccines)(with_vaccines), smoothFactor = 0.5, stroke = FALSE, fillOpacity = 0.6, popup = paste("<b>State: </b>", map_states$state, "<br/>", "<b>Vaccination</b>", "<br/>", "<b>Rate: </b>", map_states$with_vaccines, "%")) %>%
+    addLabelOnlyMarkers(data = filter(state.center, state_abb!="AK" & state_abb!="HI"), lng = ~x, lat = ~y, label = ~state_abb, labelOptions = labelOptions(noHide = T, direction = 'top', textOnly = T)) %>%
+    addLayersControl(
+      baseGroups = c("Preventable Deaths (2014)", "Access to Usual Care (2015)", "Cancer Screenings Rate (2014)", "Adult Vaccination Rate (2015)"),
+      options = layersControlOptions(collapsed = FALSE))) 
+```
+
+
+# Affordability and Cost Outcomes
+
+__Figure 10__
+
+Figure 10 demonstrates a clear negative relationship between the insured rate and the percentage of people with high out-of-pocket (OOP) medical costs relative to their annaul household income. This suggests, as we expect, that as more people get insured, they are less likely to be paying excessive out-of-pocket costs for medical expenses. This relationship holds even after controlling for income level.
+
+There was no conclusive relationship when the other two cost outcomes - annual growth in family premiums and increase in federal spending - were plotted against the insured rate.
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+## PLOT 10
+plot10 <- (ggplot(key_indicators, aes(insured_pct_2015, high_OOP_relative, label = state_abb))
+            + geom_smooth(aes(color = income_level), method = "lm", lwd = 1, se = FALSE)
+            + geom_smooth(color = "black", method = "lm", linetype = 2, lwd = 1, se = FALSE)
+            + geom_point(aes(color = income_level, shape = state_has_expanded), size = 2)
+           + geom_text(aes(label = state_abb), nudge_y = -0.2, check_overlap = TRUE, size = 2.5, color = "gray30")
+
+           + scale_color_manual(values = brewer.pal(n = 4, name = "Dark2"))
+           + labs(x = "% Insured", y = "People with High OOP Costs Relative to Household Income", color = "Income \nLevel", shape = "State has \nExpanded \nMedicaid")
+           + ggtitle("Relationship Between OOP Costs and Health \nInsurance Coverage Among States")
+           + theme_minimal()
+           + theme(plot.title = element_text(face="bold", hjust = 0.5, size = 12)))
+plot10
+```
+
+
+__Figure 11__
+
+Similarly, we map how the states performed in the following financial and cost outcomes:
+
+1) Percentage of people with high OOP costs relative to annual household income (2015)
+
+2) Average annual premium growth rate from 2010 to 2015
+
+3) Affordability of the marketplace plans, measured by the marketplace consumers who can obtain a plan less than $100 (2017). Note that states that do not operate a insurance marketplace are shaded in gray.
+
+4) Net increase in federal spending (in millions of dollars) over the period (up till 2016)
+
+As before, a green color incidates a comparatively more favorable outcome, while a red color indicates a less favorable outcome.
+
+We notice that states that do better in containing OOP costs tend to do worse in containing premium and marketplace plan rates as well as federal spending. These include some states like New York, New Jersey and Ohio in the Northeast and Midwest (Great Lakes). A notable exception is Massachussets, which performs well across the financial measures, possibly because of the headstart it got with "Romney-care", which actually served as a model for Obamacare.
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+## PLOT 11: LEAFLET MAP - AFFORDABILITY / COST OUTCOMES
+marketplace_pct <- map_states$IM_plan_under_100
+marketplace_pct <- marketplace_pct * 100
+marketplace_pct[is.na(marketplace_pct)] <- "No State Marketplace"
+marketplace_pct_symbol <- ifelse(marketplace_pct=="No State Marketplace", "", "%")
+
+(leaflet(map_states) %>% 
+    setView(lat=39.8282, lng=-96 , zoom=4) %>%
+    addPolygons(color = "#333333", weight = 1, smoothFactor = 0.5, fillOpacity = 0) %>%
+    addPolygons(group = "Contained OOP Costs (2015)", fillColor = ~colorQuantile("RdYlGn", -high_OOP_relative)(-high_OOP_relative), smoothFactor = 0.5, stroke = FALSE, fillOpacity = 0.6, popup = paste("<b>State: </b>", map_states$state, "<br/>", "<b>People with High OOP</b>", "<br/>", "<b>Relative to Income: </b>", map_states$high_OOP_relative, "%")) %>%
+    addPolygons(group = "Premium Growth Rate (2010-2015)", fillColor = ~colorQuantile("RdYlGn", -premium_ann_growth_10_15)(-premium_ann_growth_10_15), smoothFactor = 0.5, stroke = FALSE, fillOpacity = 0.6, popup = paste("<b>State: </b>", map_states$state, "<br/>", "<b>Annual Premium Growth</b>", "<br/>", "<b>Rate (2010-2015): </b>", map_states$premium_ann_growth_10_15, "%")) %>%
+    addPolygons(group = "Affordable Marketplace Plan (2017)", fillColor = ~colorQuantile("RdYlGn", IM_plan_under_100)(IM_plan_under_100), smoothFactor = 0.5, stroke = FALSE, fillOpacity = 0.6, popup = paste("<b>State: </b>", map_states$state, "<br/>", "<b>Marketplace Consumers</b>", "<br/>", "<b>Who Can Select Plan</b>", "<br/>","<b>Under $100: </b>", marketplace_pct, marketplace_pct_symbol)) %>%
+    addPolygons(group = "Increase in Federal Spending (2016)", fillColor = ~colorQuantile("RdYlGn", -incr_fed_spending_mil)(-incr_fed_spending_mil), smoothFactor = 0.5, stroke = FALSE, fillOpacity = 0.6, popup = paste("<b>State: </b>", map_states$state, "<br/>", "<b>Net Increase in Federal</b>", "<br/>", "<b>Spending</b>: $", map_states$incr_fed_spending_mil, "million")) %>%
+    addLabelOnlyMarkers(data = filter(state.center, state_abb!="AK" & state_abb!="HI"), lng = ~x, lat = ~y, label = ~state_abb, labelOptions = labelOptions(noHide = T, direction = 'top', textOnly = T)) %>%
+    addLayersControl(
+      baseGroups = c("Contained OOP Costs (2015)", "Premium Growth Rate (2010-2015)", "Affordable Marketplace Plan (2017)", "Increase in Federal Spending (2016)"),
+      options = layersControlOptions(collapsed = FALSE))) 
+```
+
+
+# Summary of States' Performance
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+# Create data table reporting values
+data_table_values <- key_indicators[ , c("state", "insured_pct_2015", "deaths_amenable_2014", "usual_care_2015", "high_OOP_relative", "premium_ann_growth_10_15", "incr_fed_spending_mil")]
+
+# Create data table reporting rank
+data_table_rank <- data_table_values[ , c("state", "insured_pct_2015", "deaths_amenable_2014", "usual_care_2015", "high_OOP_relative", "premium_ann_growth_10_15")]
+
+# Convert each function to rank
+  # Rank 1 is always more favorable (regardless of definition of variable)    
+data_table_rank$r_insured_pct_2015 <- rank(-data_table_values$insured_pct_2015, na.last = "keep", ties.method = "min")
+data_table_rank$r_deaths_amenable_2014 <- rank(data_table_values$deaths_amenable_2014, na.last = "keep", ties.method = "min")
+data_table_rank$r_usual_care_2015 <- rank(-data_table_values$usual_care_2015, na.last = "keep", ties.method = "min")
+data_table_rank$r_high_OOP_relative <- rank(data_table_values$high_OOP_relative, na.last = "keep", ties.method = "min")
+data_table_rank$r_premium_ann_growth_10_15 <- rank(data_table_values$premium_ann_growth_10_15, na.last = "keep", ties.method = "min")
+data_table_rank$r_incr_fed_spending_mil <- rank(data_table_values$incr_fed_spending_mil, na.last = "keep", ties.method = "min")
+  # Remove value variables
+data_table_rank$insured_pct_2015 <- NULL
+data_table_rank$deaths_amenable_2014 <- NULL
+data_table_rank$usual_care_2015 <- NULL
+data_table_rank$high_OOP_relative <- NULL
+data_table_rank$premium_ann_growth_10_15 <- NULL
+data_table_rank$incr_fed_spending_mil <- NULL
+```
+
+Finally, we want to compare how the states do across both health and cost outcomes, and eventually get to some form of ranking of the states.
+
+The following data table presents the rankings of the states on the following insurance coverage, health and affordability outcomes, providing a summary of the states' performance:
+
+1) Percentage of population insured
+
+2) Deaths preventable by healthcare intervention (per 100,000 people)
+
+3) Proportion of adults with access to a usual source of care
+
+4) Proportion of people with high out-of-pocket costs (relative to household income)
+
+5) Annual rate of health insurance premium growth from 2010 to 2015
+
+6) Net increase in federal spending on healthcare up till 2016
+
+A rank of 1 always indicates the more favorable outcome (i.e. higher insurance and treatment access rate, lower preventable mortality, OOP costs, premium growth, and federal spending increase).
+
+__Figure 12__
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+## PLOT 12: DATA TABLE RANKING STATES ON VARIOUS MEASURES
+datatable(data_table_rank, rownames = FALSE, colnames = c("State", "Percentage Insured", "Fewer Preventable Deaths", "Usual Care Access", "OOP Contained", "Lower Annual Premium Growth", "Lower Increase in Federal Spending"), caption = "Rank of the 50 States in Insurance Coverage, Health and Cost Outcomes")
+```
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+# Compute overall ranking of states by each of three measures
+data_table_rank_cat <- data_table_rank
+  # Insurance coverage
+data_table_rank_cat$insurance_rank <- data_table_rank$r_insured_pct_2015
+  # Health
+data_table_rank_cat$health_rank_sum <- data_table_rank$r_deaths_amenable_2014 + data_table_rank$r_usual_care_2015
+data_table_rank_cat$health_rank <- rank(data_table_rank_cat$health_rank_sum, na.last = "keep", ties.method = "min")
+  # Finance
+data_table_rank_cat$cost_rank_sum <- data_table_rank$r_high_OOP_relative + data_table_rank$r_premium_ann_growth_10_15 + data_table_rank$r_incr_fed_spending_mil
+data_table_rank_cat$cost_rank <- rank(data_table_rank_cat$cost_rank_sum, na.last = "keep", ties.method = "min")
+
+data_table_rank_cat <- data_table_rank_cat[ , c("state", "insurance_rank", "health_rank", "cost_rank")]
+data_table_rank_cat$sum_of_ranks <- data_table_rank_cat$insurance_rank + data_table_rank_cat$health_rank + data_table_rank_cat$cost_rank
+data_table_rank_cat$overall_rank <- rank(data_table_rank_cat$sum_of_ranks, na.last = "keep", ties.method = "min")
+
+data_table_rank_cat_long <- data_table_rank_cat
+data_table_rank_cat_long <- reshape(data_table_rank_cat, 
+                      varying = c("insurance_rank", "health_rank", "cost_rank"),
+                      v.names = "Rank",
+                      timevar = "Category",
+                      times = c("Insurance", "Health", "Cost"),
+                      new.row.names = 1:1000,
+                      direction = "long")
+```
+
+
+__Figure 13__
+
+We present a way of aggregating the rankings of the states in the above six health measures into an overall rank. We rank each state on each of three dimensions, insurance coverage, health outcomes, and cost control outcomes. For the health and cost control outcomes, since they have multiple subcomponents (2 and 3 respectively, as in the data table), we take an average over these subcomponent ranks. We then add up the ranks in the three dimensions to find an overall rank to order the states. 
+
+States at the top of this chart (with lower rank numbers) perform the best on the whole in their healthcare system. Mouse over the interactive plot to view the overall state rank. Note that you can _toggle the three criteria on and off_ to include or exclude each criteria from the graph.
+
+We see that many of the states with high-performing healthcare systems are New England states, including Vermont, Rhode Island, Massechussets and Connecticut, while Minnesota and Iowa also perform well. At the other end, the poorest performing states across all measures are Georgia, Oklahoma, Louisiana and Texas, mostly states in the Southeast and Southwest.
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+plot13 <- (ggplot(data_table_rank_cat_long, aes(x = reorder(state, -overall_rank), y = Rank, fill = Category, label = overall_rank))
+           + geom_col(position = "stack")
+           + coord_flip()
+           + labs(x = "", y = "", fill = "Rank \nCriteria")
+           + scale_fill_manual(values = brewer.pal(n = 3, name = "Dark2")[c(2,1,3)])
+           + ggtitle("Overall Ranking of States Healthcare Systems")
+  + theme_minimal()
+  + theme(plot.title = element_text(face="bold", hjust = 0, size = 12), 
+          axis.text.y = element_text(size = 6.5),
+          axis.ticks.x = element_blank(),
+          axis.text.x = element_blank()))
+ggplotly(plot13, tooltip = "overall_rank")
+```
+

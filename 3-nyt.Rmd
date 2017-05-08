@@ -1,0 +1,212 @@
+---
+title: "R Notebook"
+output:
+  html_document: default
+  html_notebook: default
+---
+---
+title: "NYT"
+output: html_document
+---
+
+# Perceptions of ACA (Text Analysis)
+
+We are also interested in how people think about Affordable care act(ACA). We want to have a look of the tweets and newspaper related to ACA. To realize this, we use API to download articles realted to ACA on New york times from 2011-2017 and transform them into corpus to do the text analysis.
+
+__Research Questions:__
+1) The overll trend of public attention, which can be shown as the number of articles related to ACA in different years.
+2) What people discuss about when they discuss ACA, which can be shown as the word frequencies.
+
+We could see that people discussed ACA a lot when obama first signed it, and the election in 2017 made it a hot topic again. And not suprisingly, peopel always talk about Trump when they talk about ACA
+
+
+```{r, warning=FALSE, include=FALSE, tidy=TRUE}
+library(tm)
+library(tm.plugin.lexisnexis)
+library(readxl)
+library(gtools)  # for smartbind
+library(dplyr)   # for data_frame
+library(lubridate)   # for date formatting
+library(stringr)  
+library(tools)  # Title case
+library(quanteda)
+library(ggplot2)
+library(quanteda)
+library(stringr)
+library(tm)
+library(qdap)
+library(SnowballC)
+library(dplyr)
+library(tidytext)
+library(wordcloud)
+library(ggthemes)
+
+# Combine CSV and HTML Files
+data <- read_excel("LexisNexis/NYTimes_Metadata.xlsx")
+colnames(data) <- tolower(colnames(data))
+
+# Correct data
+data$date <- substr(parse_date_time(data$date, c("mdy")),1,10)
+data$author <- toTitleCase(tolower(data$byline))
+data$byline <- NULL
+
+## Get Text files
+source1 <- LexisNexisSource("LexisNexis/The_New_York1.html")
+source2 <- LexisNexisSource("LexisNexis/The_New_York2.html")
+
+corpus1 <- Corpus(source1, readerControl = list(language = NA))
+corpus2 <- Corpus(source2, readerControl = list(language = NA))
+
+corpus <- c(corpus1, corpus2)
+
+# Convert to quanteda corpus
+corpus <- quanteda::corpus(corpus)
+
+## Add Metadata
+# Check: match(data$headline, corpus$documents$heading)
+corpus$documents$datetimestamp <- substring(corpus$documents$datetimestamp, 1,4)
+corpus$documents$date <- corpus$documents$datetimestamp
+corpus$documents$description <- corpus$documents$id
+
+# options(width = 200)
+# kwic(corpus, "Trump")
+# 
+save(corpus, file="nytimes.rda")
+```
+
+__Figure 14__
+
+We could see that people discussed ACA a lot when Obama first signed it, and the election in 2017 made it a hot topic again. And not suprisingly, people always talk about Trump when they talk about ACA.
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+dat <- data.frame(date =corpus$documents$datetimestamp, levels=c(1:1000))
+ggplot(data=dat, aes(x=date)) +geom_bar(stat="count") + 
+  ggtitle("Number of Articles Mentioning ACA by Year")+theme_tufte()+ylab("Number of articles") +
+  xlab("year") + theme(plot.title = element_text(face="bold", hjust = 0.5, size = 12)) + 
+  theme_minimal()
+```
+
+```{r, warning=FALSE, include=FALSE, tidy=TRUE}
+load("nytimes.rda")
+dfmtotal <- dfm(corpus, remove = stopwords("english"), stem = TRUE, removePunct = TRUE, removeNumbers = TRUE, tolower = TRUE, verbose = TRUE)
+dfmtotal[, 1:5]
+head(stopwords("english"), 20)
+freq<-topfeatures(dfmtotal, 20)
+wf <- data.frame(word=names(freq), freq=freq)   
+```
+
+__Figure 15__
+
+The graph shows that the frequently use words are health, insur and care. And other words like law, people and republican are also frequently used. It is not surprising that the articles most features on the health care issues, and yet the topics of people, policy and politics are also highly concerned in New York Times.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, tidy=TRUE}
+library(plotly)
+pp <- plot_ly(subset(wf, freq>50), x = ~freq, y = ~reorder(word, freq), type = "bar", orientation = 'h') %>%
+  layout(title = "Word Frequency from Articles on ACA, 2011-2017",
+         xaxis = list(title = "Top 30 Used Stem"),
+         yaxis = list(title = "Frequency of Stem"),
+         margin = list(l = 120, r = 10, t = 80, b = 80))
+pp
+```
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+load('nytimes.rda')
+NYT_source <- VectorSource(corpus$documents[,1])
+NYT <- VCorpus(NYT_source)
+documents <- corpus$documents
+removeNumPunct <- function(x){gsub("[^[:alpha:][:space:]]*", "", x)}
+clean_corpus <- function(corpus){
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, content_transformer(tolower))
+corpus <- tm_map(corpus, content_transformer(replace_symbol))
+corpus <- tm_map(corpus, removeWords, c(stopwords("english"), "will", "can"))
+# We could add more stop words as above
+corpus <- tm_map(corpus, stripWhitespace)
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, content_transformer(removeNumPunct))
+return(corpus)
+}
+NYT_clean <- clean_corpus(NYT)
+NYT_stem <- tm_map(NYT_clean, stemDocument)
+meta(NYT_stem, type = "local", tag = "author") <- documents$author
+NYT_dtm <- DocumentTermMatrix(NYT_stem)
+NYT_tdm <- TermDocumentMatrix(NYT_stem)
+
+NYT_tdm2 <- tidy(NYT_tdm)
+NYT_dtm2 <- tidy(NYT_dtm)
+NYT_tidy <- tidy(NYT_stem)
+NYT_tdm2 <- merge(NYT_tdm2, NYT_tidy, by.x = "document", by.y = "id", all.x =
+TRUE)
+NYT_dtm2 <- merge(NYT_dtm2, NYT_tidy, by.x = "document", by.y = "id", all.x =
+TRUE)
+
+```
+
+
+__Figure 16__
+
+##### Wordcloud by Year
+
+In the beginning, the articles mainly focused on the law issues as we can see from the frequently used words such as federal, act, mandate, judge, reform, etc. As time passed, the topics mainly focused on financial issues, the words that articles frequently mentioned are workers, business, tax, financial, subsidies, medicaid, etc. In the latest two years, due to the presidential election, the topics are changed to political concerns. For example, the words like people, trump, republicans, house, and repeal are frequently used in the articles.
+
+```{r, eval = TRUE, echo = FALSE, warning = FALSE, tidy = TRUE}
+atxt <- documents$texts[documents$datetimestamp == "2011"]
+btxt <- documents$texts[documents$datetimestamp == "2012"]
+ctxt <- documents$texts[documents$datetimestamp == "2013"]
+dtxt <- documents$texts[documents$datetimestamp == "2014"]
+etxt <- documents$texts[documents$datetimestamp == "2015"]
+ftxt <- documents$texts[documents$datetimestamp == "2016"]
+gtxt <- documents$texts[documents$datetimestamp == "2017"]
+
+clean.text <- function(x)
+{
+# tolower
+x = tolower(x)
+# remove rt
+x = gsub("rt", "", x)
+# remove at
+x = gsub("@\\w+", "", x)
+# remove punctuation
+x = gsub("[[:punct:]]", "", x)
+# remove numbers
+x = gsub("[[:digit:]]", "", x)
+# remove links http
+x = gsub("http\\w+", "", x)
+# remove tabs
+x = gsub("[ |\t]{2,}", "", x)
+# remove blank spaces at the beginning
+x = gsub("^ ", "", x)
+# remove blank spaces at the end
+x = gsub(" $", "", x)
+return(x)
+}
+
+aclean <- clean.text(atxt)
+bclean <- clean.text(btxt)
+cclean <- clean.text(ctxt)
+dclean <- clean.text(dtxt)
+eclean <- clean.text(etxt)
+fclean <- clean.text(ftxt)
+gclean <- clean.text(gtxt)
+
+a <- paste(aclean, collapse=" ")
+b <- paste(bclean, collapse=" ")
+c <- paste(cclean, collapse=" ")
+d <- paste(dclean, collapse=" ")
+e <- paste(eclean, collapse=" ")
+f <- paste(fclean, collapse=" ")
+g <- paste(gclean, collapse=" ")
+
+# put everything in a single vector
+all <- c(a,b,c,d,e,f,g)
+all <- removeWords(all, c("will", "can", "the", "that","are","mrs","not","said","cou"))
+# create corpus
+corpus2 <- Corpus(VectorSource(all))
+# create term-document matrix
+cloudtdm <- TermDocumentMatrix(corpus2)
+# convert as matrix
+cloudtdm <- as.matrix(cloudtdm)
+# add column names
+colnames(cloudtdm) <- c("2011","2012","2013","2014","2015","2016","2017")
+comparison.cloud(cloudtdm, random.order=FALSE,colors = brewer.pal(8, "Dark2"),title.size=1.5, max.words = 200)
+```

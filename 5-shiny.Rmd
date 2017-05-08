@@ -1,0 +1,16 @@
+---
+output: html_document
+---
+
+
+<div class="row" style="padding-top: 60px;">
+
+
+# Shiny APP
+
+https://gracekongyx.shinyapps.io/health_insurance_shiny/
+
+
+<iframe src="https://gracekongyx.shinyapps.io/health_insurance_shiny/" style="border: none; width: 440px; height: 900px"></iframe>
+
+
