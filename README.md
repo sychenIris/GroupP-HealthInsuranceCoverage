@@ -10,9 +10,9 @@ https://columbia-university-qmss.github.io/GroupP-Final/
 
 Team Members:
 
--Grace Yun Xin Kong (gyk2108@columbia.edu)
--Iris Shih-Yin Chen (sc4071@tc.columbia.edu)
--Fang Liu (fl2407@columbia.edu)
+- Grace Yun Xin Kong (gyk2108@columbia.edu)
+- Iris Shih-Yin Chen (sc4071@tc.columbia.edu)
+- Fang Liu (fl2407@columbia.edu)
 
 #### Abstract: We are interested in finding out how health insurance coverage in the USA differs from state to state, its relationship to indicators of health performance, and whether it can be predicted by political factors. We will explore the following questions:
 
